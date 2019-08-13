@@ -1,1 +1,7 @@
 .idea/
+data
+model
+model-sp
+__pycache__
+cache-sp/
+data-sp/
