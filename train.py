@@ -3,9 +3,9 @@ import torch
 import os
 import json
 import random
-import tokenization_bert
 import numpy as np
 import argparse
+from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from tqdm import tqdm
 from torch.nn import DataParallel
@@ -23,7 +23,8 @@ def build_files(data_path, tokenized_data_path, num_pieces, full_tokenizer, min_
         sublines = lines[all_len // num_pieces * i: all_len // num_pieces * (i + 1)]
         if i == num_pieces - 1:
             sublines.extend(lines[all_len // num_pieces * (i + 1):])  # 把尾部例子添加到最后一个piece
-        sublines = [full_tokenizer.tokenize(line) for line in sublines if len(line) > min_length]  # 只考虑长度超过128的句子
+        sublines = [full_tokenizer.tokenize(line) for line in sublines if
+                    len(line) > min_length]  # 只考虑长度超过min_length的句子
         sublines = [full_tokenizer.convert_tokens_to_ids(line) for line in sublines]
         full_line = []
         for subline in sublines:
@@ -43,7 +44,7 @@ def main():
                         help='选择模型参数')
     parser.add_argument('--tokenizer_path', default='cache/vocab_small.txt', type=str, required=False, help='选择词库')
     parser.add_argument('--raw_data_path', default='data/train.json', type=str, required=False, help='原始训练语料')
-    parser.add_argument('--tokenized_data_path', default='data/tokenized', type=str, required=False,
+    parser.add_argument('--tokenized_data_path', default='data/tokenized/', type=str, required=False,
                         help='tokenized语料存放位置')
     parser.add_argument('--raw', action='store_true', help='是否先做tokenize')
     parser.add_argument('--epochs', default=5, type=int, required=False, help='训练循环')
@@ -60,11 +61,22 @@ def main():
     parser.add_argument('--min_length', default=128, type=int, required=False, help='最短收录文章长度')
     parser.add_argument('--output_dir', default='model/', type=str, required=False, help='模型输出路径')
     parser.add_argument('--pretrained_model', default='', type=str, required=False, help='模型训练起点路径')
+    parser.add_argument('--writer_dir', default='tensorboard_summary/', type=str, required=False, help='Tensorboard路径')
+    parser.add_argument('--no_wordpiece', action='store_true', help='不做word piece切词')
+
     args = parser.parse_args()
-    print(args)
+    print('args:\n' + args.__repr__())
+
+    if args.no_wordpiece:
+        import tokenization_bert_without_wordpiece as tokenization_bert
+    else:
+        import tokenization_bert
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.device  # 此处设置程序使用哪些显卡
+
     model_config = pytorch_transformers.modeling_gpt2.GPT2Config.from_json_file(args.model_config)
+    print('config:\n' + model_config.to_json_string())
+
     n_ctx = model_config.n_ctx
     full_tokenizer = tokenization_bert.BertTokenizer(vocab_file=args.tokenizer_path)
     full_tokenizer.max_len = n_ctx
@@ -87,7 +99,7 @@ def main():
     num_pieces = args.num_pieces
     min_length = args.min_length
     output_dir = args.output_dir
-   
+    tb_writer = SummaryWriter(log_dir=args.writer_dir)
 
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
@@ -102,6 +114,7 @@ def main():
         model = pytorch_transformers.modeling_gpt2.GPT2LMHeadModel(config=model_config)
     else:
         model = pytorch_transformers.modeling_gpt2.GPT2LMHeadModel.from_pretrained(args.pretrained_model)
+    model.train()
     model.to(device)
 
     num_parameters = 0
@@ -134,6 +147,7 @@ def main():
         model = DataParallel(model)
         multi_gpu = True
     print('starting training')
+    overall_step = 0
     for epoch in range(epochs):
         print('epoch {}'.format(epoch + 1))
         now = datetime.now()
@@ -153,7 +167,7 @@ def main():
                 samples.append(tokens[start_point: start_point + n_ctx])
                 start_point += stride
             start_point -= stride
-            last = tokens[start_point + n_ctx :]
+            last = tokens[start_point + n_ctx:]
             last.extend([full_tokenizer.convert_tokens_to_ids(['[PAD]']) * (n_ctx - len(last))])
             random.shuffle(samples)
             for step in range(len(samples) // batch_size):  # drop last
@@ -195,7 +209,10 @@ def main():
                     scheduler.step()
                     optimizer.step()
                     optimizer.zero_grad()
-                if (step + 1) % log_step == 0:
+                    overall_step += 1
+                    if (overall_step + 1) % log_step == 0:
+                        tb_writer.add_scalar('loss', loss.item(), overall_step)
+                if (overall_step + 1) % log_step == 0:
                     print('now time: {}:{}. Step {} of piece {} of epoch {}, loss {}'.format(
                         datetime.now().hour,
                         datetime.now().minute,

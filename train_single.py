@@ -43,7 +43,7 @@ def main():
     parser.add_argument('--model_config', default='config/model_config_small.json', type=str, required=False, help='选择模型参数')
     parser.add_argument('--tokenizer_path', default='cache/vocab_small.txt', type=str, required=False, help='选择词库')
     parser.add_argument('--raw_data_path', default='data/train.json', type=str, required=False, help='原始训练语料')
-    parser.add_argument('--tokenized_data_path', default='data/tokenized', type=str, required=False, help='tokenized语料存放位置')
+    parser.add_argument('--tokenized_data_path', default='data/tokenized/', type=str, required=False, help='tokenized语料存放位置')
     parser.add_argument('--raw', action='store_true', help='是否先做tokenize')
     parser.add_argument('--epochs', default=5, type=int, required=False, help='训练循环')
     parser.add_argument('--batch_size', default=8, type=int, required=False, help='训练batch size')
@@ -58,12 +58,20 @@ def main():
     parser.add_argument('--num_pieces', default=100, type=int, required=False, help='将训练语料分成多少份')
     parser.add_argument('--output_dir', default='model/', type=str, required=False, help='模型输出路径')
     parser.add_argument('--pretrained_model', default='', type=str, required=False, help='模型训练起点路径')
+    parser.add_argument('--no_wordpiece', action='store_true', help='不做word piece切词')
 
     args = parser.parse_args()
-    print(args)
+    print('args:\n' + args.__repr__())
+
+    if args.no_wordpiece:
+        import tokenization_bert_without_wordpiece as tokenization_bert
+    else:
+        import tokenization_bert
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.device  # 此处设置程序使用哪些显卡
     model_config = pytorch_transformers.modeling_gpt2.GPT2Config.from_json_file(args.model_config)
+    print('config:\n' + model_config.to_json_string())
+
     n_ctx = model_config.n_ctx
     full_tokenizer = tokenization_bert.BertTokenizer(vocab_file=args.tokenizer_path)
     full_tokenizer.max_len = n_ctx
@@ -96,6 +104,7 @@ def main():
         model = pytorch_transformers.modeling_gpt2.GPT2LMHeadModel(config=model_config)
     else:
         model = pytorch_transformers.modeling_gpt2.GPT2LMHeadModel.from_pretrained(args.pretrained_model)
+    model.train()
     model.to(device)
     multi_gpu = False
     full_len = 0

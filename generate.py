@@ -8,6 +8,13 @@ from tqdm import trange
 from pytorch_transformers import GPT2LMHeadModel
 
 
+def is_word(word):
+    for item in list(word):
+        if item not in 'qwertyuiopasdfghjklzxcvbnm':
+            return False
+    return True
+
+
 def _is_chinese_char(char):
     """Checks whether CP is the codepoint of a CJK character."""
     # This defines a "chinese character" as anything in the CJK Unicode block:
@@ -30,6 +37,7 @@ def _is_chinese_char(char):
         return True
 
     return False
+
 
 def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
     """ Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
@@ -99,7 +107,8 @@ def main():
     parser.add_argument('--temperature', default=1, type=float, required=False, help='生成温度')
     parser.add_argument('--topk', default=8, type=int, required=False, help='最高几选一')
     parser.add_argument('--topp', default=0, type=float, required=False, help='最高积累概率')
-    parser.add_argument('--model_config', default='config/model_config_small.json', type=str, required=False, help='模型参数')
+    parser.add_argument('--model_config', default='config/model_config_small.json', type=str, required=False,
+                        help='模型参数')
     parser.add_argument('--tokenizer_path', default='cache/vocab_small.txt', type=str, required=False, help='词表路径')
     parser.add_argument('--model_path', default='model/final_model', type=str, required=False, help='模型路径')
     parser.add_argument('--prefix', default='萧炎', type=str, required=False, help='生成文章的开头')
@@ -118,7 +127,6 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     tokenizer = tokenization_bert.BertTokenizer(vocab_file=args.tokenizer_path)
-    model_config = pytorch_transformers.GPT2Config.from_json_file(args.model_config)
     model = GPT2LMHeadModel.from_pretrained(args.model_path)
     model.to(device)
     model.eval()
@@ -139,9 +147,15 @@ def main():
                 temperature=temperature, top_k=topk, top_p=topp, device=device
             )
             out = out.tolist()
+
             for i in range(batch_size):
                 generated += 1
                 text = tokenizer.convert_ids_to_tokens(out[0])
+
+                for i, item in enumerate(text[:-1]):  # 确保英文前后有空格
+                    if is_word(item) and is_word(text[i + 1]):
+                        text[i] = item + ' '
+
                 for i, item in enumerate(text):
                     if item == '[MASK]':
                         text[i] = ''
