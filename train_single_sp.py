@@ -15,14 +15,17 @@ token using sentencepiece
 '''
 
 g_corpus_name = 'channel'
+# g_corpus_name = 'hongloumeng'
+
+g_vocab_size = 16000
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', default='0,1,2,3', type=str, required=False, help='设置使用哪些显卡')
-    parser.add_argument('--model_config', default='config-sp/{}/model_config.json'.format(g_corpus_name), type=str, required=False, help='选择模型参数')
-    parser.add_argument('--sp_model_file', default='cache-sp/{}/channel_sp_model.model'.format(g_corpus_name), type=str, required=False, help='选择词库')
-    parser.add_argument('--tokenized_data_path', default='data-sp/{}/tokenized'.format(g_corpus_name), type=str, required=False, help='tokenized语料存放位置')
+    parser.add_argument('--model_config', default='config-sp/model_config.json', type=str, required=False, help='选择模型参数')
+    parser.add_argument('--sp_model_file', default='cache-sp/{}/channel_sp_model.model_{}'.format(g_corpus_name, g_vocab_size), type=str, required=False, help='选择词库')
+    parser.add_argument('--tokenized_data_path', default='data-sp/{}/tokenized_sss'.format(g_corpus_name), type=str, required=False, help='tokenized语料存放位置')
     parser.add_argument('--epochs', default=5, type=int, required=False, help='训练循环')
     parser.add_argument('--batch_size', default=8, type=int, required=False, help='训练batch size')
     parser.add_argument('--lr', default=1.5e-4, type=float, required=False, help='学习率')
@@ -61,6 +64,9 @@ def main():
     max_grad_norm = args.max_grad_norm
     num_pieces = args.num_pieces
     output_dir = args.output_dir
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     if not args.pretrained_model:
         model = pytorch_transformers.modeling_gpt2.GPT2LMHeadModel(config=model_config)
@@ -105,7 +111,8 @@ def main():
                 line = f.read().strip()
             tokens = line.split()
             tokens = [int(token) for token in tokens]
-            start_point = 0
+            rs = np.random.RandomState(seed=None)
+            start_point = rs.randint(0, stride)
             samples = []
             while start_point < len(tokens) - n_ctx:
                 samples.append(tokens[start_point: start_point + n_ctx])
@@ -147,8 +154,8 @@ def main():
                 #  optimizer step
                 if (step + 1) % gradient_accumulation == 0:
                     running_loss += loss.item()
-                    scheduler.step()
                     optimizer.step()
+                    scheduler.step()
                     optimizer.zero_grad()
                 if (step + 1) % log_step == 0:
                     print('now time: {}:{}. Step {} of piece {} of epoch {}, loss {}'.format(

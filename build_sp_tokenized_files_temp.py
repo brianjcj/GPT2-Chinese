@@ -5,13 +5,13 @@ import os
 g_corpus_name = 'channel'
 # g_corpus_name = 'hongloumeng'
 g_text_file_with_sep_path = 'data-sp/{}/train_sep.txt'.format(g_corpus_name)
-g_tokenized_data_dir_path = 'data-sp/{}/tokenized'.format(g_corpus_name)
+g_tokenized_data_dir_path = 'data-sp/{}/tokenized_sss'.format(g_corpus_name)
 g_vocab_size = 16000
 g_model_prefix = '{}_sp_model_{}'.format(g_corpus_name, g_vocab_size)
 g_model_file = '{}/{}/{}.model'.format('cache-sp', g_corpus_name, g_model_prefix)
 # g_num_pieces = 100
-# g_num_pieces = 10
-g_num_pieces = 1
+g_num_pieces = 10
+# g_num_pieces = 1
 
 
 def build_files(raw_data_path, tokenized_data_path, model_file, num_pieces):
@@ -50,6 +50,6 @@ def test_take_a_look(tokenized_data_path, model_file, n):
 
 
 if __name__ == '__main__':
-    build_files(raw_data_path=g_text_file_with_sep_path, tokenized_data_path=g_tokenized_data_dir_path,
-                model_file=g_model_file, num_pieces=g_num_pieces)
+    # build_files(raw_data_path=g_text_file_with_sep_path, tokenized_data_path=g_tokenized_data_dir_path,
+    #             model_file=g_model_file, num_pieces=g_num_pieces)
     test_take_a_look(tokenized_data_path=g_tokenized_data_dir_path, model_file=g_model_file, n=0)

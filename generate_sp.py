@@ -8,7 +8,10 @@ from pytorch_transformers import GPT2LMHeadModel
 import sentencepiece as spm
 
 g_corpus_name = 'channel'
+# g_corpus_name = 'hongloumeng'
+
 g_return_token = 'Й'
+g_vocab_size = 16000
 
 
 def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
@@ -79,10 +82,10 @@ def main():
     parser.add_argument('--temperature', default=1, type=float, required=False, help='生成温度')
     parser.add_argument('--topk', default=8, type=int, required=False, help='最高几选一')
     parser.add_argument('--topp', default=0, type=float, required=False, help='最高积累概率')
-    parser.add_argument('--model_config', default='config-sp/{}/model_config.json'.format(g_corpus_name), type=str, required=False, help='选择模型参数')
-    parser.add_argument('--sp_model_file', default='cache-sp/{}/channel_sp_model.model'.format(g_corpus_name), type=str, required=False, help='选择词库')
-    parser.add_argument('--tokenized_data_path', default='data-sp/{}/tokenized'.format(g_corpus_name), type=str, required=False, help='tokenized语料存放位置')
-    parser.add_argument('--model_path', default='model-sp/channel/final_model', type=str, required=False, help='模型路径')
+    parser.add_argument('--model_config', default='config-sp/model_config.json'.format(g_corpus_name), type=str, required=False, help='选择模型参数')
+    parser.add_argument('--sp_model_file', default='cache-sp/{}/{}_sp_model_{}.model'.format(g_corpus_name, g_corpus_name, g_vocab_size), type=str, required=False, help='选择词库')
+    # parser.add_argument('--tokenized_data_path', default='data-sp/{}/tokenized'.format(g_corpus_name), type=str, required=False, help='tokenized语料存放位置')
+    parser.add_argument('--model_path', default='model-sp/{}/final_model'.format(g_corpus_name), type=str, required=False, help='模型路径')
     parser.add_argument('--prefix', default='主播', type=str, required=False, help='生成文章的开头')
 
     args = parser.parse_args()
@@ -127,6 +130,7 @@ def main():
                 generated += 1
                 # text = tokenizer.convert_ids_to_tokens(out[0])
                 text = sp.DecodeIds(out[0])
+                text = text.replace(g_return_token + " ", '\n')
                 text = text.replace(g_return_token, '\n')
                 print("=" * 40 + " SAMPLE " + str(generated) + " " + "=" * 40)
                 text = ''.join(text).replace('##', '').strip()
